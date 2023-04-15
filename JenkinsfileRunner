@@ -1,0 +1,50 @@
+pipeline {
+    agent{
+		label 'linux'
+	}
+
+	environment {
+		DOCKER_IMAGE_NAME = "ontirex/jenkins-build"
+		DOCKER_IMAGE_TAG = "latest"
+        CONTAINER_NAME = "aws-instance-checker"
+        AWS_REGION="eu-central-1"
+        EC2_INSTANCE_STATE_CODE="80"
+    }
+
+
+  triggers {
+    // Automatically run the pipeline every 5 minutes
+    cron('*/5 * * * *')
+  }
+
+  stages {
+    stage('Clean Docker container') {
+      steps {
+        script {
+          // Clean up the Docker container before running it
+          sh "docker stop ${CONTAINER_NAME} || true"
+          sh "docker rm ${CONTAINER_NAME} || true"
+        }  
+      }
+    }
+    
+    stage('Run Docker container') {
+      steps {
+        script {
+          sh "docker pull ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+          withCredentials([usernamePassword(credentialsId: 'aws_access', usernameVariable: 'aws_access_key_id', passwordVariable: 'aws_secret_access_key')]) {
+			sh "docker run --env 'aws_access_key_id=${aws_access_key_id}' --env 'aws_secret_access_key=v4aFyyTbzL3AW+wr9e2MNYDiaIlNklZBxz+kk5h8' --env 'aws_region=${AWS_REGION}' --env 'ec2_instance_state_code=${EC2_INSTANCE_STATE_CODE}' --env 'sleep_timeout_minutes=5' --name ${CONTAINER_NAME} ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}"
+		  }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      // Clean up the Docker container after running it
+      sh "docker stop ${CONTAINER_NAME} || true"
+      sh "docker rm ${CONTAINER_NAME} || true"
+    }
+  }
+}
